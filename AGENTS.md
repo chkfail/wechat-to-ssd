@@ -21,7 +21,7 @@ MNT="${WECHAT_MOUNT:-$HOME/Library/Containers/com.tencent.xinWeChat/Data/Documen
 
 plist 用 `.template` + 占位符，由 `install.sh` 里的 `sed` 填充。这是公开仓库，写死卷名或 home 路径会泄露个人信息 —— 之前踩过，`com.local.wechatmount.plist` 里的 `/Users/<name>/bin/...` 差点被推上去。
 
-`wechat-migrate.sh` 那两道 `yes` 确认不要合并或去掉。第二道的位置是关键：`ditto` 完成、校验数字打印之后、`mv` 之前。
+`wechat-migrate.sh` 那两道 `yes` 确认不要合并或去掉。第二道的位置是关键：`ditto` 完成、校验结果打印之后、`mv` 之前。`wechat-restore.sh` 同理：第二道在拷回并校验之后、卸载镜像之前。
 
 ## 中文脚本特有的坑
 

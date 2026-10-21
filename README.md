@@ -59,6 +59,7 @@ cd wechat-to-ssd
 | **拔盘前必须退微信** | 这是唯一的真实风险点，SQLite 写到一半断连会坏库 |
 | **手机才是主备份** | Mac 端始终当缓存看待 |
 | **适合谁** | Mac mini / Studio 这类常年接盘的台式机最合适；笔记本要掂量一下线被碰掉的概率 |
+| **微信版本** | 只支持 4.x（数据在 `xwechat_files`），3.x 先升级 |
 
 ---
 
@@ -129,9 +130,9 @@ LaunchAgent 以 `/bin/bash` 身份访问受 TCC 保护的容器目录，不给�
 ./wechat-migrate.sh
 ```
 
-脚本会自动探测数据目录（4.x 的 `xwechat_files` / 3.x 的 `Application Support`）、拷进镜像、打印两边大小和文件数。**破坏性操作前有两道 `yes` 确认。**
+脚本把 `xwechat_files` 拷进镜像，再逐个对比两边的文件路径和大小（自动排除 `.fseventsd` 等卷元数据）。**破坏性操作前有两道 `yes` 确认。**
 
-核对要点：两边 `du` 大小一致即可。目标会多出几个卷元数据条目（`.fseventsd` 等），文件数不完全相等是正常的，别拿文件数做硬性断言。
+核对要点：打印「一致」才会问第二道 `yes`；不一致会直接中止并列出差异，原数据不动。已经迁移过（挂载点已挂上、带 `uchg`，或 `.bak` 还在）会拒绝重跑。镜像里有上次中止留下的数据时会先问要不要清空 —— 原数据还在内置盘上，清空是安全的。
 
 ### 4. 验证
 
@@ -157,7 +158,7 @@ cat "${TMPDIR:-/tmp}/wechatmount.log"
 mount | grep xwechat
 ```
 
-日志里 `Permission denied` = 第 2 步的 `/bin/bash` 授权没做或没生效。
+日志里 `Permission denied` 或 `Operation not permitted` = 第 2 步的 `/bin/bash` 授权没做或没生效。
 
 ## 故障排查
 
@@ -166,6 +167,7 @@ mount | grep xwechat
 | `Operation not permitted` 读容器 | TCC，不是沙盒。需要完全磁盘访问权限，且授权后要重启进程 |
 | `hdiutil: attach failed - Permission denied` | LaunchAgent 跑的 `/bin/bash` 没有完全磁盘访问权限 |
 | 微信打不开、提示重新登录 | 镜像没挂上。跑 `bash ~/bin/wechat-mount.sh`，数据没丢 |
+| 日志里「不是迁移后留下的空挂载点」 | 挂载点非空或没有 `uchg`：还没迁移，或已经回退。这是保护，挂上去会遮住真实数据 |
 | `unbound variable` | `$VAR` 紧跟全角标点会被 bash 吞进变量名，用 `${VAR}` |
 | `sudo` + `<(...)` 报 `Bad file descriptor` | sudo 切断了进程替换的 fd。本项目所有操作都不需要 sudo |
 
@@ -183,26 +185,19 @@ bash ~/bin/wechat-compact.sh                      # 回收空间（先退微信�
 
 ## 回退
 
+先 Cmd+Q 退微信，在有完全磁盘访问权限的「终端」App 里：
+
 ```bash
-# 先 Cmd+Q 退微信
-. ~/.config/wechat-to-ssd.conf
-MNT="$HOME/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files"
-
-launchctl unload ~/Library/LaunchAgents/com.local.wechatmount.plist
-rm ~/Library/LaunchAgents/com.local.wechatmount.plist
-
-hdiutil attach "$WECHAT_IMAGE" -mountpoint /tmp/wcback -nobrowse -owners on
-hdiutil detach "$MNT"
-chflags nouchg "$MNT" && rmdir "$MNT"
-ditto /tmp/wcback "$MNT"
-hdiutil detach /tmp/wcback
+./wechat-restore.sh
 ```
 
-内置盘需要有足够空间容纳全部数据。
+脚本先检查内置盘空间够不够，把镜像里的数据拷回内置盘并逐个对比，再卸载镜像、移除 LaunchAgent、把副本换回原位置。两道 `yes` 确认；中途中止的话镜像照常挂着，微信不受影响。
+
+镜像本身不删，确认微信正常后按脚本最后的提示手动删。
 
 ## 设计约束（改代码前必读）
 
-**`uchg` 不是装饰。** 挂载点空目录上的 immutable 标志是数据分叉保护：挂载失败时微信写不进去、只会报错。没有它，微信会在内置盘重建一套空数据，用户以为没事继续用，下次挂载成功时这套新数据被盖掉 —— 那才是真正丢数据的场景。已在真实的挂载失败中验证生效。
+**`uchg` 不是装饰。** 挂载点空目录上的 immutable 标志是数据分叉保护：挂载失败时微信写不进去、只会报错。没有它，微信会在内置盘重建一套空数据，用户以为没事继续用，下次挂载成功时这套新数据被盖掉 —— 那才是真正丢数据的场景。已在真实的挂载失败中验证生效。`wechat-mount.sh` 也靠它认挂载点：只往空的、带 `uchg` 的目录上挂，否则拒绝 —— 迁移前或回退后那里是真实数据，挂上去会把它遮住。
 
 **免 root 是整个方案成立的前提。** `hdiutil attach -mountpoint <用户目录>` 不需要 root，所以能用 LaunchAgent 而非 LaunchDaemon。任何改用 `diskutil` 或其他挂载方式的改动，都必须先验证免 root 是否还成立。
 
@@ -215,9 +210,10 @@ hdiutil detach /tmp/wcback
 | 文件 | 作用 |
 |---|---|
 | `install.sh` | 建镜像、写配置、装脚本和 LaunchAgent。不动数据 |
-| `wechat-migrate.sh` | 一次性迁移。路径自动探测 + 两道确认 |
-| `wechat-mount.sh` | 挂载。幂等，等待 SSD 出现（默认最多 180 秒） |
+| `wechat-migrate.sh` | 一次性迁移。逐文件校验 + 两道确认 |
+| `wechat-mount.sh` | 挂载。幂等，只往空的 `uchg` 挂载点上挂，等待 SSD 出现（默认最多 180 秒） |
 | `wechat-compact.sh` | 回收 sparsebundle 空间 |
+| `wechat-restore.sh` | 回退：数据拷回内置盘、移除 LaunchAgent。逐文件校验 + 两道确认 |
 | `com.local.wechatmount.plist.template` | LaunchAgent 模板，`RunAtLoad` + `StartOnMount` |
 | `AGENTS.md` | 改这个仓库代码时的约定和检查清单（`CLAUDE.md` 指向它） |
 

@@ -14,7 +14,7 @@ pgrep -x WeChat >/dev/null && { echo "微信还在运行，请 Cmd+Q 完全退�
 
 echo "压缩前: $(du -sh "$IMG" | cut -f1)"
 
-if mount | grep -q " on ${MNT} "; then
+if mount | grep -qF " on ${MNT} ("; then
   echo "卸载镜像..."
   hdiutil detach "$MNT" >/dev/null
 fi
@@ -26,7 +26,7 @@ echo "压缩后: $(du -sh "$IMG" | cut -f1)"
 
 echo "重新挂载..."
 bash "$MOUNT_SCRIPT" >/dev/null 2>&1 || true
-if mount | grep -q " on ${MNT} "; then
+if mount | grep -qF " on ${MNT} ("; then
   echo "完成，微信可以打开了。"
 else
   echo "警告：重新挂载失败，手动跑  bash $MOUNT_SCRIPT"
