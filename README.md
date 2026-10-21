@@ -166,6 +166,7 @@ mount | grep xwechat
 |---|---|
 | `Operation not permitted` 读容器 | TCC，不是沙盒。需要完全磁盘访问权限，且授权后要重启进程 |
 | `hdiutil: attach failed - Permission denied` | LaunchAgent 跑的 `/bin/bash` 没有完全磁盘访问权限 |
+| `hdiutil: attach failed - Resource busy` | 镜像已经挂在别处了（比如在 Finder 里双击打开过）。`hdiutil info` 找到它，`hdiutil detach` 掉再挂 |
 | 微信打不开、提示重新登录 | 镜像没挂上。跑 `bash ~/bin/wechat-mount.sh`，数据没丢 |
 | 日志里「不是迁移后留下的空挂载点」 | 挂载点非空或没有 `uchg`：还没迁移，或已经回退。这是保护，挂上去会遮住真实数据 |
 | `unbound variable` | `$VAR` 紧跟全角标点会被 bash 吞进变量名，用 `${VAR}` |

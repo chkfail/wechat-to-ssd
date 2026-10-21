@@ -8,7 +8,7 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: 语法
         run: git ls-files -z '*.sh' | xargs -0 -n1 bash -n
@@ -35,7 +35,7 @@ jobs:
   macos:
     runs-on: macos-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: /bin/bash 3.2 语法
         run: git ls-files -z '*.sh' | xargs -0 -n1 /bin/bash -n

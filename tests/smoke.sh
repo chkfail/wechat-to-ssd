@@ -50,8 +50,8 @@ echo wal > "${D}/wxid_abc/db_storage/message/message_0.db-wal"
 head -c 3000000 /dev/urandom > "${D}/wxid_abc/msg/file/a b.bin"
 echo cfg > "${D}/all_users/config/global.ini"
 echo h > "${D}/.hidden"
-ln -s wxid_abc "${D}/link_top"
-ln -s ../db_storage "${D}/wxid_abc/msg/link_inner"
+ln -s all_users/config/global.ini "${D}/link_top"
+ln -s ../db_storage/message/message_0.db "${D}/wxid_abc/msg/link_inner"
 
 # --- install --------------------------------------------------------------
 t 0 "install（卷路径带结尾 /）" yes /bin/bash "${REPO}/install.sh" "${VOL}/" 1g

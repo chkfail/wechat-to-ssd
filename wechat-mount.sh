@@ -27,7 +27,7 @@ for _ in $(seq 1 "$WAIT"); do
 done
 [ -d "$IMG" ] || { echo "$(date): 等待 ${WAIT}s 后仍未找到镜像 ${IMG}，放弃"; exit 1; }
 
-# 以 mount 表为准，不只看 hdiutil 的退出码：镜像已挂在别处时它可能照样返回成功
+# 以 mount 表为准：只要最后没挂在这里就算失败（镜像已挂在别处时 hdiutil 报 Resource busy）
 hdiutil attach "$IMG" -mountpoint "$MNT" -nobrowse -owners on
 if mount | grep -qF " on ${MNT} ("; then
   echo "$(date): 挂载成功"
