@@ -19,7 +19,7 @@ IMG="${WECHAT_IMAGE:?...}"
 MNT="${WECHAT_MOUNT:-$HOME/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files}"
 ```
 
-plist 用 `.template` + 占位符，由 `install.sh` 里的 `sed` 填充。这是公开仓库，写死卷名或 home 路径会泄露个人信息 —— 之前踩过，`com.local.wechatmount.plist` 里的 `/Users/<name>/bin/...` 差点被推上去。
+plist 用 `.template` + 占位符，由 `install.sh` 里的 `sed` 填充。这是公开仓库，写死卷名或 home 路径会泄露个人信息 —— 之前踩过，`com.local.wechatmount.plist` 里展开后的 home 绝对路径差点被推上去。
 
 `wechat-migrate.sh` 那两道 `yes` 确认不要合并或去掉。第二道的位置是关键：`ditto` 完成、校验结果打印之后、`mv` 之前。`wechat-restore.sh` 同理：第二道在拷回并校验之后、卸载镜像之前。
 
@@ -35,11 +35,14 @@ perl -ne 'print "$ARGV:$.: $_" if /\$[A-Za-z_]\w*[^\x00-\x7F]/' *.sh
 
 ## 发布前检查
 
+CI（`.github/workflows/check.yml`）每次 push 都会跑下面这些，本地提交前也可以先跑一遍：
+
 ```bash
-for f in *.sh; do bash -n "$f" || echo "FAIL $f"; done
-perl -ne 'print "$ARGV:$.: $_" if /\$[A-Za-z_]\w*[^\x00-\x7F]/' *.sh
-git grep -niE "/Users/|Mac-mini|ts\.net" -- .            # 个人信息，只应命中 LICENSE 署名
-git ls-files -s | grep -v 100755 | grep '\.sh$'          # 脚本应为 100755
+for f in $(git ls-files '*.sh'); do bash -n "$f" || echo "FAIL $f"; done
+git ls-files -z '*.sh' | xargs -0 perl -ne 'print "$ARGV:$.: $_" if /\$[A-Za-z_]\w*[^\x00-\x7F]/'
+git ls-files -z '*.sh' | xargs -0 shellcheck -s bash -e SC1090
+git grep -niE '/User[s]/|Mac-min[i]|ts\.ne[t]' -- .      # 个人信息，应无输出（方括号防止匹配到这行自己）
+git ls-files -s '*.sh' | grep -v '^100755'                # 脚本应为 100755，应无输出
 ```
 
 最后一条踩过：`install.sh` 被创建时没带执行位，clone 下来是 `permission denied`。
@@ -56,3 +59,5 @@ hdiutil attach "$TMPDIR/t.sparsebundle" -mountpoint "$TMPDIR/m" -nobrowse -owner
 ```
 
 注意你自己的 shell 多半没有完全磁盘访问权限，容器相关的命令必须交给用户在「终端」App 里跑。
+
+CI 的 macOS job 会跑 `tests/smoke.sh`：临时 HOME + 临时 sparsebundle，用 `/bin/bash` 3.2 把 install → migrate → mount → compact → restore 走一遍。改了流程就同步改它。它会注册和注销 `com.local.wechatmount` 这个 LaunchAgent，所以只在 CI 里跑（没有 `CI` 环境变量会直接退出），别在装着真实方案的 Mac 上跑。

@@ -1,0 +1,44 @@
+name: check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 语法
+        run: git ls-files -z '*.sh' | xargs -0 -n1 bash -n
+
+      - name: $VAR 紧跟多字节字符
+        run: |
+          out="$(git ls-files -z '*.sh' | xargs -0 perl -ne 'print "$ARGV:$.: $_" if /\$[A-Za-z_]\w*[^\x00-\x7F]/')"
+          [ -z "$out" ] || { echo "$out"; exit 1; }
+
+      - name: shellcheck
+        run: git ls-files -z '*.sh' | xargs -0 shellcheck -s bash -e SC1090
+
+      - name: 个人信息
+        # 方括号是为了不匹配到这一行自己
+        run: |
+          out="$(git grep -niE '/User[s]/|Mac-min[i]|ts\.ne[t]' -- . || true)"
+          [ -z "$out" ] || { echo "$out"; exit 1; }
+
+      - name: 脚本执行位
+        run: |
+          out="$(git ls-files -s '*.sh' | grep -v '^100755' || true)"
+          [ -z "$out" ] || { echo "$out"; exit 1; }
+
+  macos:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: /bin/bash 3.2 语法
+        run: git ls-files -z '*.sh' | xargs -0 -n1 /bin/bash -n
+
+      - name: 冒烟测试（临时 HOME + 临时 sparsebundle）
+        run: /bin/bash tests/smoke.sh

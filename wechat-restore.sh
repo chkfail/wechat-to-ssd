@@ -10,6 +10,8 @@ CONF="${WECHAT_TO_SSD_CONF:-$HOME/.config/wechat-to-ssd.conf}"
 IMG="${WECHAT_IMAGE:?未配置镜像路径。请创建 $CONF 并写入 WECHAT_IMAGE=/Volumes/你的盘名/WeChatData.sparsebundle}"
 MNT="${WECHAT_MOUNT:-$HOME/Library/Containers/com.tencent.xinWeChat/Data/Documents/xwechat_files}"
 PLIST="$HOME/Library/LaunchAgents/com.local.wechatmount.plist"
+DOMAIN="gui/$(id -u)"
+LABEL="com.local.wechatmount"
 RESTORE="${MNT}.restore"
 SRC_LIST="$(mktemp "${TMPDIR:-/tmp}/wcrestore.XXXXXX")"
 DST_LIST="${SRC_LIST}.dst"
@@ -80,11 +82,11 @@ read -r -p "卸载镜像、移除 LaunchAgent、换回普通目录？输入 yes 
 [ "$ok" = "yes" ] || { echo "已中止。镜像照常挂着，拷好的副本在 ${RESTORE}，不要可以删掉。"; exit 1; }
 
 # --- 3. 换回普通目录 ---------------------------------------------------
-[ -f "$PLIST" ] && { launchctl unload "$PLIST" 2>/dev/null || true; }
+[ -f "$PLIST" ] && { launchctl bootout "${DOMAIN}/${LABEL}" 2>/dev/null || true; }
 if ! hdiutil detach "$MNT" >/dev/null; then
-  [ -f "$PLIST" ] && { launchctl load "$PLIST" 2>/dev/null || true; }
+  [ -f "$PLIST" ] && { launchctl bootstrap "$DOMAIN" "$PLIST" 2>/dev/null || true; }
   echo "卸载失败，可能有程序还占着（Finder 窗口、终端 cd 在里面等）。"
-  echo "什么都没动：镜像照常挂着，LaunchAgent 已重新加载。"
+  echo "什么都没动：镜像照常挂着，LaunchAgent 已重新加载（没加载上的话下次登录会自动加载）。"
   echo "关掉占用的程序，删掉 ${RESTORE} 后重跑。"
   exit 1
 fi

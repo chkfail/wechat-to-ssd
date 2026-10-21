@@ -14,6 +14,8 @@ pgrep -x WeChat >/dev/null && { echo "微信还在运行，请 Cmd+Q 完全退�
 
 echo "压缩前: $(du -sh "$IMG" | cut -f1)"
 
+# 中途出错或 Ctrl-C 也要挂回去，不然微信打不开
+trap 'echo "没走完，重新挂载..."; bash "$MOUNT_SCRIPT" >/dev/null 2>&1 || true' EXIT
 if mount | grep -qF " on ${MNT} ("; then
   echo "卸载镜像..."
   hdiutil detach "$MNT" >/dev/null
@@ -21,6 +23,7 @@ fi
 
 echo "压缩中，几分钟，中途别拔盘别 Ctrl-C..."
 hdiutil compact "$IMG"
+trap - EXIT
 
 echo "压缩后: $(du -sh "$IMG" | cut -f1)"
 

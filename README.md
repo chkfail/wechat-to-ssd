@@ -154,7 +154,7 @@ df -h /System/Volumes/Data     # 和第 0 步对比，空间应该降下来了
 失败的话：
 
 ```bash
-cat "${TMPDIR:-/tmp}/wechatmount.log"
+cat ~/Library/Logs/wechatmount.log      # 也可以在「控制台」App 的「日志报告」里看
 mount | grep xwechat
 ```
 
